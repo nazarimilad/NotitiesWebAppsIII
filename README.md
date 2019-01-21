@@ -6,8 +6,8 @@
 [Fact]
 public void Draw_EmptyDeck_ThrowsException() {
     for (int i = 1; i <= 52; i++)
-	    _deck.Draw();
-	Assert.Throws<InvalidOperationException>(() => _deck.Draw());
+        _deck.Draw();
+    Assert.Throws<InvalidOperationException>(() => _deck.Draw());
 }
 ```
 
@@ -96,6 +96,7 @@ builder.HasOne(b => b.Product).WithMany().
 
 ### Repository pattern
 Implementatie repositoryklasse: 
+
 * bij elke methode: `Include()` methoden niet vergeten voor referentie-attributen
 * bij `GetAll()`: `AsNoTracking()` toevoegen (om performanter te maken)
 
@@ -104,26 +105,26 @@ Bv.: CategoryRepository:
 ```csharp
 public IEnumerable<Category> GetAll() { return _categories.AsNoTracking().ToList();}
 ```
-
+\pagebreak
 ### Locale gegevens opslaan
 1) In startUp klasse:
-    1.1) In methode ConfigureServices: `services.AddSession();`
-    1.2) In methode Configure: `app.useSession();`
+    1) In methode ConfigureServices: `services.AddSession();`
+    2) In methode Configure: `app.useSession();`
 
 2) Klassen en properties taggen:
-    2.1) Boven naam klassen die gepersisteerd moeten worden: `[JsonObject(MemberSerialization.OptIn)]`
-    2.2) Boven properties die gepersisteerd moeten worden: `[JsonProperty]`
-    2.3) Als klasse anders geïnitialiseerd moet worden wanneer het van lokale opslag afgelezen wordt      (dan wanneer het expliciet aangemaakt wordt met de keyword `new`): Een extra Json constructor toevoegen:
+    1) Boven naam klassen die gepersisteerd moeten worden: `[JsonObject(MemberSerialization.OptIn)]`
+    2) Boven properties die gepersisteerd moeten worden: `[JsonProperty]`
+    3) Als klasse anders geïnitialiseerd moet worden wanneer het van lokale opslag afgelezen wordt      (dan wanneer het expliciet aangemaakt wordt met de keyword `new`): Een extra Json constructor toevoegen:
 ```csharp
 [JsonConstructor]
 private Product(int productId) {
- 	ProductId = productId;
+    ProductId = productId;
 }
 ```
 3. Schrijven en lezen:
-    3.1) Schrijven:
+    1) Schrijven:
 `Cart c = JsonConvert.DeserializeObject<Cart>(HttpContext.Session.GetString("cart"));`
-    3.2) Lezen:
+    2) Lezen:
 `HttpContext.Session.SetString("cart", JsonConvert.SerializeObject(_cart));`
 
 ### Opmerkingen
@@ -153,9 +154,9 @@ private Product(int productId) {
 ### Form actions
 ```html
 <form>
-	<button formaction="/Cart/Plus/@cartLine.Product.ProductId" type="submit">Plus</button>
-	<button formaction="/Cart/Min/@cartLine.Product.ProductId" type="submit">Min</button>
-	<button formaction="/Cart/Delete/@cartLine.Product.ProductId" type="submit">Delete</button>
+    <button formaction="/Cart/Plus/@cartLine.Product.ProductId" type="submit">Plus</button>
+    <button formaction="/Cart/Min/@cartLine.Product.ProductId" type="submit">Min</button>
+    <button formaction="/Cart/Delete/@cartLine.Product.ProductId" type="submit">Delete</button>
 </form>
 ```
 
@@ -163,11 +164,12 @@ private Product(int productId) {
 
 ### DisplayName
 Gebruik van DiplayName voor enums:
+
 1) Voeg `[Display(Name = ...)]` toe voor elke enum-element in de enumklasse
 2) Creëer een extensionklasse EnumHelpers met een extension-hulp-methode `GetDisplayName(TEnum)`:
 ```csharp
 public static string GetDisplayName<TEnum>(this TEnum enumValue) {
-   	return typeof(TEnum).GetMember(enumValue.ToString())[0]
+    return typeof(TEnum).GetMember(enumValue.ToString())[0]
                         .GetCustomAttribute<DisplayAttribute>()?
                         .Name ?? enumValue.ToString();
 }
@@ -175,7 +177,7 @@ public static string GetDisplayName<TEnum>(this TEnum enumValue) {
 3) Voeg in Views/_ViewImports.cshtml: `@using .../EnumHelpers.cs`
 4) Gebruik de methode in een view:
 ```html
-	<td>
+    <td>
         @EnumHelpers.GetDisplayName(item.Availability)
     </td>
 ```
