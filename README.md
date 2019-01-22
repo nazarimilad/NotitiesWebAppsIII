@@ -29,6 +29,17 @@ public static IEnumerable<object[]> Data =>
         new object[] { int.MinValue, -1, int.MaxValue }};
 ```
 
+### Type parameters voor mock training
+
+* Om het even welke soort Product: 
+
+`_mockProductRepository.Setup(m => m.Add(It.IsAny<Product>()));`
+
+* Een product die niet null mag zijn: 
+
+`_mockProductRepository.Setup(p => p.Add(It.IsNotNull<Product>()));`
+\pagebreak
+
 ## Extension methods
 Nieuwe map Extensions met bestand Extension.cs:
 ```csharp
@@ -105,11 +116,11 @@ Bv.: CategoryRepository:
 ```csharp
 public IEnumerable<Category> GetAll() { return _categories.AsNoTracking().ToList();}
 ```
-\pagebreak
+
 ### Locale gegevens opslaan
 1) In startUp klasse:
     1) In methode ConfigureServices: `services.AddSession();`
-    2) In methode Configure: `app.useSession();`
+    2) In methode Configure: `app.useSession();` (voor `app.useMVC()`)
 
 2) Klassen en properties taggen:
     1) Boven naam klassen die gepersisteerd moeten worden: `[JsonObject(MemberSerialization.OptIn)]`
@@ -123,8 +134,11 @@ private Product(int productId) {
 ```
 3. Schrijven en lezen:
     1) Schrijven:
+
 `Cart c = JsonConvert.DeserializeObject<Cart>(HttpContext.Session.GetString("cart"));`
+
     2) Lezen:
+
 `HttpContext.Session.SetString("cart", JsonConvert.SerializeObject(_cart));`
 
 ### Opmerkingen
@@ -132,6 +146,7 @@ private Product(int productId) {
 
 * Unit testing van controllers: Get en Post methoden APART testen
 
+\pagebreak
 ## View snippets
 
 ### Selection lists
@@ -142,7 +157,9 @@ private Product(int productId) {
     <div class="form-inline">
         <div class="form-group">
             <label for="categoryId"></label>
-            <select id="categoryId" name="categoryId" asp-items="@(ViewData["Categories"] as SelectList)" class="form-control">
+            <select id="categoryId" name="categoryId" 
+                    asp-items="@(ViewData["Categories"] as SelectList)" 
+                    class="form-control">
                 <option value="">-- all categories --</option>
             </select>
         </div>
@@ -181,12 +198,101 @@ public static string GetDisplayName<TEnum>(this TEnum enumValue) {
         @EnumHelpers.GetDisplayName(item.Availability)
     </td>
 ```
+\pagebreak
 
 ### Scripts aan einde pagina toevoegen
 In de view waarin validatie uitgevoerd wordt (bv. Edit.cshtml), aan het einde, de volgende toevoegen:
 ```html
 @section scripts {
     <script src="~/lib/jquery-validation/dist/jquery.validate.js"></script>
-    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.js">
+    </script>
+}
+```
+
+### DeleteConfirmed
+In de DeleteConfirmed moet alles binnen een try-catch-block komen:
+```csharp
+[HttpPost, ActionName("Delete")]
+public IActionResult DeleteConfirmed(int id) {
+    try {
+        Product product = _productRepository.GetById(id);
+        if (product == null)
+            return NotFound();
+        _productRepository.Delete(product);
+        _productRepository.SaveChanges();
+        TempData["message"] = $"You successfully deleted product {product.Name}.";
+    }
+    catch {
+        TempData["error"] = "Sorry, something went wrong, the product was not deleted...";
+    }
+    return RedirectToAction(nameof(Index));
+```
+
+## Authenticatie
+
+1) In Startup klasse:
+    A) In ConfigureServices de volgende toevoegen:
+```csharp
+AddDefaultIdentity<IdentityUser>().AddEntityFrameworkStores<ApplicationDbContext>();
+services.AddAuthorization(options => {
+    options.AddPolicy("AdminOnly", policy => policy.RequireClaim(ClaimTypes.Role, "admin"));
+    options.AddPolicy("Customer", policy => policy.RequireClaim(ClaimTypes.Role, "customer"));
+});
+```
+
+B) In Configure de volgende toevoegen (voor `app.useMvc()`):
+    
+    `app.UseAuthentication();`
+    En de InitializeData()-oproep aanpassen:
+    
+    `sportsStoreDataInitializer.InitializeData().Wait();`
+C) In ApplicationDbContext klasse:  klasse laten extenden van IdentityDbContext ipv DbContext
+D) In DataInitializer klasse:
+
+D1) DI: 
+    
+```csharp
+private readonly ApplicationDbContext _dbContext;
+private readonly UserManager<IdentityUser> _userManager;
+
+public SportsStoreDataInitializer(ApplicationDbContext dbContext, 
+                                  UserManager<IdentityUser> userManager) {
+    _dbContext = dbContext;
+    _userManager = userManager;
+}
+```
+D2) Aanmaken van nieuwe users:
+    
+```csharp
+public async Task InitializeData() {
+    ...
+    var userName = klant.CustomerName + "@hogent.be";
+    await CreateUser(userName, userName, "P@ssword1", "Customer");
+    ...
+    await CreateUser("admin@sportsstore.be", "admin@sportsstore.be", 
+                     "P@ssword1", "Admin");
+}
+private async Task CreateUser(string userName, string email, string password, string role) {
+    var user = new IdentityUser { UserName = userName, Email = email };
+    await _userManager.CreateAsync(user, password);
+    await _userManager.AddClaimAsync(user, new Claim(ClaimTypes.Role, role));
+}
+```
+
+### Layout aanpassen naargelang welke user aangemeld is
+in _Layout.cshtml:
+
+```html
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
+...
+<ul class="nav navbar-nav">
+    <li><a asp-area="" asp-controller="Home" asp-action="Index">Home</a></li>
+    @if ((await AuthorizationService.AuthorizeAsync(User, "Admin")).Succeeded) {
+        <li><a asp-area="" asp-controller="Product" asp-action="Index">Products</a></li>
+    }
+    ...
+</ul>
 }
 ```
